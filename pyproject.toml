@@ -1,0 +1,87 @@
+[project]
+name = "tscx"
+version = "0.1"
+description = "Runs TypeScript type checking and filters the results to show only errors from specific files"
+readme = "README.md"
+authors = [{name = "Mateus Junior"}]
+license = "Apache-2.0"
+requires-python = ">=3.8"
+classifiers = []
+dependencies = [
+    "click"
+]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project.urls]
+Homepage = "https://github.com/falleng0d/tscx"
+Changelog = "https://github.com/falleng0d/tscx/releases"
+Issues = "https://github.com/falleng0d/tscx/issues"
+CI = "https://github.com/falleng0d/tscx/actions"
+
+[project.scripts]
+tscx = "tscx.cli:cli"
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest",
+    "setuptools",
+]
+
+[tool.ruff]
+# Set the longest allowed line length (default is 88)
+line-length = 90
+# Specify the target Python version(s) for compatibility checks.
+# Examples: "py37", "py38", "py39", "py310", "py311", "py312"
+# Ruff will attempt to infer this from `requires-python` if not set.
+target-version = "py310"
+
+# Optional: Exclude files or directories.
+# Ruff respects .gitignore by default.
+# exclude = [
+#     ".bzr",
+#     ".direnv",
+#     # ... other common exclusions
+#     "my_generated_code_folder/",
+# ]
+
+[tool.ruff.lint]
+# Select the rules you want to enable.
+# Start with a sensible default set and expand as needed.
+# "E" and "F" (pycodestyle and Pyflakes) are enabled by default.
+# "I" enables isort import sorting rules.
+# For a good starting point, consider:
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+#   E: pycodestyle errors
+#   W: pycodestyle warnings
+#   F: Pyflakes
+#   I: isort (import sorting)
+#   UP: pyupgrade (modernize Python code)
+#   B: flake8-bugbear (finds potential bugs)
+#   SIM: flake8-simplify (simplifies code)
+
+# You can also ignore specific rules if necessary.
+# ignore = ["E501"] # Example: ignore line too long if you handle it differently
+
+# Automatically fixable rules will be applied when running `ruff check --fix`
+# You can specify which groups of rules are fixable (default is ["ALL"])
+# fixable = ["ALL"]
+# Or specify unfixable ones
+# unfixable = []
+
+[tool.ruff.format]
+# Enable formatting. Ruff's formatter is Black-compatible.
+# By default, formatting is not enabled unless explicitly run or configured.
+# To have `ruff check` also report formatting issues, you might need to enable
+# specific lint rules that overlap with formatting, or rely on `ruff format`.
+
+# Optional: Configure formatter specifics (defaults are often sensible)
+# quote-style = "double"  # Or "single"
+# indent-style = "space"  # Or "tab"
+# skip-magic-trailing-comma = false # If true, formatter respects magic trailing commas
+# line-ending = "auto" # Or "lf", "crlf", "native"
