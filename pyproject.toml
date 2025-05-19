@@ -3,7 +3,7 @@ name = "tscx"
 version = "0.1"
 description = "Runs TypeScript type checking and filters the results to show only errors from specific files"
 readme = "README.md"
-authors = [{name = "Mateus Junior"}]
+authors = [{name = "Mateus Junior", email = "mateus@matj.dev"}]
 license = "Apache-2.0"
 requires-python = ">=3.12"
 classifiers = []
@@ -29,9 +29,11 @@ test = ["pytest"]
 
 [tool.uv]
 dev-dependencies = [
+    "build>=1.2.2.post1",
     "pytest",
     "ruff>=0.11.10",
     "setuptools",
+    "twine>=6.1.0",
 ]
 
 [tool.ruff]
