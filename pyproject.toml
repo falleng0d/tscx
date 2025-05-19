@@ -42,7 +42,7 @@ line-length = 90
 # Specify the target Python version(s) for compatibility checks.
 # Examples: "py37", "py38", "py39", "py310", "py311", "py312"
 # Ruff will attempt to infer this from `requires-python` if not set.
-target-version = "py310"
+target-version = "py312"
 
 # Optional: Exclude files or directories.
 # Ruff respects .gitignore by default.
