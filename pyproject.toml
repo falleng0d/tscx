@@ -5,7 +5,7 @@ description = "Runs TypeScript type checking and filters the results to show onl
 readme = "README.md"
 authors = [{name = "Mateus Junior"}]
 license = "Apache-2.0"
-requires-python = ">=3.8"
+requires-python = ">=3.12"
 classifiers = []
 dependencies = [
     "click"
