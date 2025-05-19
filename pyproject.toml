@@ -30,6 +30,7 @@ test = ["pytest"]
 [tool.uv]
 dev-dependencies = [
     "pytest",
+    "ruff>=0.11.10",
     "setuptools",
 ]
 
