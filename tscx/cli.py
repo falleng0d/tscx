@@ -41,7 +41,9 @@ def cli(ctx: click.Context, files: tuple[str, ...], project: str, tsc_path: str)
         sys.exit(exit_code)
 
 
-def execute_tsc(tsc_path: str, project: str) -> tuple[CompletedProcess | None, int]:
+def execute_tsc(
+    tsc_path: str, project: str | None
+) -> tuple[CompletedProcess | None, int]:
     """Execute TypeScript compiler and return the result.
 
     Args:
@@ -52,6 +54,7 @@ def execute_tsc(tsc_path: str, project: str) -> tuple[CompletedProcess | None, i
         Tuple containing the subprocess result and an exit code
         (0 for success, 1 for error)
     """
+
     # If the specified path is the default local one, and it doesn't exist,
     # try using the global 'tsc' command
     if tsc_path == "node_modules/.bin/tsc" and not os.path.exists(tsc_path):
@@ -59,8 +62,16 @@ def execute_tsc(tsc_path: str, project: str) -> tuple[CompletedProcess | None, i
 
     # Run TypeScript compiler
     try:
+        args = (
+            [tsc_path, "--noEmit"]
+            if not project
+            else [tsc_path, "--noEmit", "-p", project]
+        )
+        if os.name == "nt":
+            args[0] = f"{args[0]}.cmd"
+
         result = subprocess.run(
-            [tsc_path, "--noEmit", "-p", project],
+            args,
             check=False,
             capture_output=True,
             text=True,
@@ -71,7 +82,7 @@ def execute_tsc(tsc_path: str, project: str) -> tuple[CompletedProcess | None, i
         return None, 1
 
 
-def run_tsc_for_file(files: tuple[str, ...], project: str, tsc_path: str) -> int:
+def run_tsc_for_file(files: tuple[str, ...], project: str | None, tsc_path: str) -> int:
     """Run TypeScript compiler and filter results.
 
     Args:
@@ -130,15 +141,15 @@ def run_tsc_for_file(files: tuple[str, ...], project: str, tsc_path: str) -> int
 @click.option(
     "-p",
     "--project",
-    default=".",
-    help="Path to the TypeScript project (default: current directory)",
+    default=None,
+    help="Path to the TypeScript project (default: no project)",
 )
 @click.option(
     "--tsc-path",
     default="node_modules/.bin/tsc",
     help="Path to TypeScript compiler (default: node_modules/.bin/tsc)",
 )
-def check_command(files: tuple[str, ...], project: str, tsc_path: str) -> int:
+def check_command(files: tuple[str, ...], project: str | None, tsc_path: str) -> int:
     """Alternative command to run TypeScript type checking.
 
     This is an alternative to the main command and works the same way.
