@@ -8,6 +8,24 @@ from subprocess import CompletedProcess
 import click
 
 
+def strip_ansi_escape_sequences(text: str) -> str:
+    """Remove ANSI escape sequences from a string.
+
+    This is used to clean terminal color codes and other escape sequences
+    from the output of commands that use --pretty or similar flags.
+
+    Args:
+        text: The string containing ANSI escape sequences
+
+    Returns:
+        The string with all ANSI escape sequences removed
+    """
+    # This pattern matches all ANSI escape sequences
+    # including color codes and cursor movement commands
+    ansi_escape_pattern = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+    return ansi_escape_pattern.sub("", text)
+
+
 def is_command_available(command: str) -> bool:
     """Check if a command is available in the PATH."""
     return shutil.which(command) is not None
@@ -19,16 +37,18 @@ def is_command_available(command: str) -> bool:
 @click.option(
     "-p",
     "--project",
-    default=".",
-    help="Path to the TypeScript project (default: current directory)",
+    default=None,
+    help="Path to the TypeScript project (default: no project)",
 )
 @click.option(
     "--tsc-path",
-    default="node_modules/.bin/tsc",
-    help="Path to TypeScript compiler (default: node_modules/.bin/tsc)",
+    default=None,
+    help="Path to TypeScript compiler (default: no custom path)",
 )
 @click.pass_context
-def cli(ctx: click.Context, files: tuple[str, ...], project: str, tsc_path: str):
+def cli(
+    ctx: click.Context, files: tuple[str, ...], project: str | None, tsc_path: str | None
+):
     """Runs TypeScript type checking and filters the results to show only errors from
     specific files.
 
@@ -42,7 +62,7 @@ def cli(ctx: click.Context, files: tuple[str, ...], project: str, tsc_path: str)
 
 
 def execute_tsc(
-    tsc_path: str, project: str | None
+    tsc_path: str | None, project: str | None
 ) -> tuple[CompletedProcess | None, int]:
     """Execute TypeScript compiler and return the result.
 
@@ -57,18 +77,20 @@ def execute_tsc(
 
     # If the specified path is the default local one, and it doesn't exist,
     # try using the global 'tsc' command
-    if tsc_path == "node_modules/.bin/tsc" and not os.path.exists(tsc_path):
+    if tsc_path and not os.path.exists(tsc_path) or not tsc_path:
         tsc_path = "tsc"
 
     # Run TypeScript compiler
     try:
         args = (
-            [tsc_path, "--noEmit"]
-            if not project
-            else [tsc_path, "--noEmit", "-p", project]
+            [tsc_path, "--noEmit", "--pretty", "-p", project]
+            if project
+            else [tsc_path, "--noEmit", "--pretty"]
         )
         if os.name == "nt":
             args[0] = f"{args[0]}.cmd"
+
+        print(f"Running TypeScript compiler: {' '.join(args)}")
 
         result = subprocess.run(
             args,
@@ -82,7 +104,7 @@ def execute_tsc(
         return None, 1
 
 
-def run_tsc_for_file(files: tuple[str, ...], project: str | None, tsc_path: str) -> int:
+def run_tsc_for_file(files: tuple[str, ...], project: str | None, tsc_path: str | None):
     """Run TypeScript compiler and filter results.
 
     Args:
@@ -113,22 +135,36 @@ def run_tsc_for_file(files: tuple[str, ...], project: str | None, tsc_path: str)
     show_continuation = False
 
     # If no files specified, show all output
-    show_all = len(include_files) == 0
+    show_all = not include_files
 
     # Process each line of output
     for line in result.stdout.splitlines() + result.stderr.splitlines():
-        if line.startswith(" "):
+        # First, sanitize the line to check if it's a continuation line
+        # but keep the original line for display
+        sanitized_line = strip_ansi_escape_sequences(line)
+
+        # Detect if this is a continuation line
+        # It's a continuation if it starts with a space or if it's a line number reference
+        # like "170     resolver:" in the TypeScript error output
+        is_continuation = (
+            sanitized_line.startswith(" ")
+            or re.match(r"^\d+\s+", sanitized_line) is not None
+        )
+
+        if is_continuation:
             # This is a continuation line
             if show_continuation or show_all:
                 click.echo(line, err=True)
         else:
             # This is a new error message - extract the filename
-            file_match = re.match(r"^([^(]+)", line)
+            # We already sanitized the line at the beginning of the loop
+            file_match = re.match(r"^([^:]+)", sanitized_line)
             if file_match:
-                file = file_match.group(1).strip()
-                if file in include_files or show_all:
+                file_path = file_match[1].strip()
+                file_name = os.path.basename(file_path)
+                if file_name in include_files or show_all:
                     show_continuation = True
-                    click.echo(line, err=True)
+                    click.echo(line, err=True)  # Echo the original line with colors
                     status = 1
                 else:
                     show_continuation = False
@@ -146,10 +182,10 @@ def run_tsc_for_file(files: tuple[str, ...], project: str | None, tsc_path: str)
 )
 @click.option(
     "--tsc-path",
-    default="node_modules/.bin/tsc",
-    help="Path to TypeScript compiler (default: node_modules/.bin/tsc)",
+    default=None,
+    help="Path to TypeScript compiler (default: no custom path)",
 )
-def check_command(files: tuple[str, ...], project: str | None, tsc_path: str) -> int:
+def check_command(files: tuple[str, ...], project: str | None, tsc_path: str | None):
     """Alternative command to run TypeScript type checking.
 
     This is an alternative to the main command and works the same way.
