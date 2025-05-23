@@ -28,6 +28,11 @@ Filter errors for specific files:
 tscx path/to/file1.ts path/to/file2.ts
 ```
 
+Filter errors for files in specific directories:
+```bash
+tscx src/components src/utils
+```
+
 ### Options
 
 - `-p, --project PATH`: Specify the TypeScript project path (default: current directory)
@@ -50,6 +55,11 @@ tscx --tsc-path /custom/path/to/tsc
 Filter errors for specific files in a project:
 ```bash
 tscx -p ./my-ts-project src/components/Button.tsx src/utils/helpers.ts
+```
+
+Filter errors for all files in specific directories:
+```bash
+tscx -p ./my-ts-project src/components src/utils
 ```
 
 For help, run:

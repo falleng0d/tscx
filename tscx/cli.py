@@ -33,7 +33,7 @@ def is_command_available(command: str) -> bool:
 
 @click.group(invoke_without_command=True)
 @click.version_option()
-@click.argument("files", nargs=-1, required=False)
+@click.argument("paths", nargs=-1, required=False)
 @click.option(
     "-p",
     "--project",
@@ -53,18 +53,44 @@ def is_command_available(command: str) -> bool:
 )
 @click.pass_context
 def cli(
-    ctx: click.Context, files: tuple[str, ...], project: str | None, tsc_path: str | None, pretty: bool
+    ctx: click.Context,
+    paths: tuple[str, ...],
+    project: str | None,
+    tsc_path: str | None,
+    pretty: bool,
 ):
     """Runs TypeScript type checking and filters the results to show only errors from
-    specific files.
+    specific files or directories.
 
-    Provide one or more file paths as arguments to filter TypeScript errors for only
-    those files. If no files are provided, all errors will be shown.
+    Provide one or more file paths or directory paths as arguments to filter TypeScript errors.
+    If a directory path is provided, all errors from files within that directory and its
+    subdirectories will be shown. If no paths are provided, all errors will be shown.
     """
     # If no subcommand is invoked, run the main functionality
     if ctx.invoked_subcommand is None:
-        exit_code = run_tsc_for_file(files, project, tsc_path, pretty)
+        exit_code = run_tsc_for_file(paths, project, tsc_path, pretty)
         sys.exit(exit_code)
+
+
+def _execute_tsc_with_parameters(tsc_path, pretty, project):
+    base_args = [tsc_path, "--noEmit"]
+    if pretty:
+        base_args.append("--pretty")
+
+    args = base_args + ["-p", project] if project else base_args
+
+    if os.name == "nt":
+        args[0] = f"{args[0]}.cmd"
+
+    print(f"Running TypeScript compiler: {' '.join(args)}")
+
+    result = subprocess.run(
+        args,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    return result, 0
 
 
 def execute_tsc(
@@ -89,38 +115,24 @@ def execute_tsc(
 
     # Run TypeScript compiler
     try:
-        # Base arguments
-        base_args = [tsc_path, "--noEmit"]
-
-        # Add pretty flag if requested
-        if pretty:
-            base_args.append("--pretty")
-
-        # Add project if specified
-        args = base_args + ["-p", project] if project else base_args
-
-        if os.name == "nt":
-            args[0] = f"{args[0]}.cmd"
-
-        print(f"Running TypeScript compiler: {' '.join(args)}")
-
-        result = subprocess.run(
-            args,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        return result, 0
+        return _execute_tsc_with_parameters(tsc_path, pretty, project)
     except Exception as e:
         click.echo(f"Error running TypeScript compiler: {str(e)}", err=True)
         return None, 1
 
 
-def run_tsc_for_file(files: tuple[str, ...], project: str | None, tsc_path: str | None, pretty: bool = False):
+def run_tsc_for_file(
+    files: tuple[str, ...],
+    project: str | None,
+    tsc_path: str | None,
+    pretty: bool = False,
+):
     """Run TypeScript compiler and filter results.
 
     Args:
-        files: Tuple of file paths to filter errors for
+        files: Tuple of file paths or directory paths to filter errors for.
+               If a directory path is provided, all files within that directory
+               and its subdirectories will be included in the filtering.
         project: Path to the TypeScript project
         tsc_path: Path to the TypeScript compiler executable
         pretty: Whether to use the --pretty flag for formatted output
@@ -128,18 +140,22 @@ def run_tsc_for_file(files: tuple[str, ...], project: str | None, tsc_path: str 
     Returns:
         Exit code (0 for success, 1 for errors)
     """
-    # Create a dictionary of files to include
     include_files: dict[str, int] = {}
+    include_paths: list[str] = []
     pwd = os.getcwd()
 
     for f in files:
+        # Normalize the path relative to current working directory
         if f.startswith(pwd):
             key = f[len(pwd) + 1 :] if f.startswith(pwd + os.sep) else f[len(pwd) :]
         else:
             key = f
-        include_files[key] = 1
 
-    # Execute TypeScript compiler
+        if os.path.isdir(f):
+            include_paths.append(key)
+        else:
+            include_files[key] = 1
+
     result, status = execute_tsc(tsc_path, project, pretty)
     if status != 0 or result is None:
         return status
@@ -147,10 +163,8 @@ def run_tsc_for_file(files: tuple[str, ...], project: str | None, tsc_path: str 
     status = 0
     show_continuation = False
 
-    # If no files specified, show all output
-    show_all = not include_files
+    show_all = not include_files and not include_paths
 
-    # Process each line of output
     for line in result.stdout.splitlines() + result.stderr.splitlines():
         # First, sanitize the line to check if it's a continuation line
         # but keep the original line for display
@@ -166,7 +180,21 @@ def run_tsc_for_file(files: tuple[str, ...], project: str | None, tsc_path: str 
         elif file_match := re.match(r"^([^:(]+)", sanitized_line):
             file_path = file_match[1].strip()
             file_name = os.path.basename(file_path)
-            if file_name in include_files or show_all:
+
+            # Check if the file is in any of the specified directories
+            in_specified_path = False
+            if include_paths:
+                for path in include_paths:
+                    # Check if file_path starts with or contains the specified path
+                    if file_path.startswith(path) or f"/{path}/" in f"/{file_path}/":
+                        in_specified_path = True
+                        break
+
+            # Show the line if:
+            # 1. The file name matches one of the specified files, or
+            # 2. The file is in one of the specified directories, or
+            # 3. No filters were specified (show all)
+            if file_name in include_files or in_specified_path or show_all:
                 show_continuation = True
                 click.echo(line, err=True)  # Echo the original line with colors
                 status = 1
@@ -177,7 +205,7 @@ def run_tsc_for_file(files: tuple[str, ...], project: str | None, tsc_path: str 
 
 
 @cli.command(name="check")
-@click.argument("files", nargs=-1, required=False)
+@click.argument("paths", nargs=-1, required=False)
 @click.option(
     "-p",
     "--project",
@@ -195,9 +223,11 @@ def run_tsc_for_file(files: tuple[str, ...], project: str | None, tsc_path: str 
     default=False,
     help="Use --pretty flag for formatted TypeScript compiler output",
 )
-def check_command(files: tuple[str, ...], project: str | None, tsc_path: str | None, pretty: bool = False):
-    """Alternative command to run TypeScript type checking.
-
-    This is an alternative to the main command and works the same way.
-    """
-    return run_tsc_for_file(files, project, tsc_path, pretty)
+def check_command(
+    paths: tuple[str, ...],
+    project: str | None,
+    tsc_path: str | None,
+    pretty: bool = False,
+):
+    """Alternative command"""
+    return run_tsc_for_file(paths, project, tsc_path, pretty)
