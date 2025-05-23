@@ -45,9 +45,15 @@ def is_command_available(command: str) -> bool:
     default=None,
     help="Path to TypeScript compiler (default: no custom path)",
 )
+@click.option(
+    "--pretty",
+    is_flag=True,
+    default=False,
+    help="Use --pretty flag for formatted TypeScript compiler output",
+)
 @click.pass_context
 def cli(
-    ctx: click.Context, files: tuple[str, ...], project: str | None, tsc_path: str | None
+    ctx: click.Context, files: tuple[str, ...], project: str | None, tsc_path: str | None, pretty: bool
 ):
     """Runs TypeScript type checking and filters the results to show only errors from
     specific files.
@@ -57,18 +63,19 @@ def cli(
     """
     # If no subcommand is invoked, run the main functionality
     if ctx.invoked_subcommand is None:
-        exit_code = run_tsc_for_file(files, project, tsc_path)
+        exit_code = run_tsc_for_file(files, project, tsc_path, pretty)
         sys.exit(exit_code)
 
 
 def execute_tsc(
-    tsc_path: str | None, project: str | None
+    tsc_path: str | None, project: str | None, pretty: bool = False
 ) -> tuple[CompletedProcess | None, int]:
     """Execute TypeScript compiler and return the result.
 
     Args:
         tsc_path: Path to the TypeScript compiler executable
         project: Path to the TypeScript project
+        pretty: Whether to use the --pretty flag for formatted output
 
     Returns:
         Tuple containing the subprocess result and an exit code
@@ -82,11 +89,16 @@ def execute_tsc(
 
     # Run TypeScript compiler
     try:
-        args = (
-            [tsc_path, "--noEmit", "--pretty", "-p", project]
-            if project
-            else [tsc_path, "--noEmit", "--pretty"]
-        )
+        # Base arguments
+        base_args = [tsc_path, "--noEmit"]
+
+        # Add pretty flag if requested
+        if pretty:
+            base_args.append("--pretty")
+
+        # Add project if specified
+        args = base_args + ["-p", project] if project else base_args
+
         if os.name == "nt":
             args[0] = f"{args[0]}.cmd"
 
@@ -104,13 +116,14 @@ def execute_tsc(
         return None, 1
 
 
-def run_tsc_for_file(files: tuple[str, ...], project: str | None, tsc_path: str | None):
+def run_tsc_for_file(files: tuple[str, ...], project: str | None, tsc_path: str | None, pretty: bool = False):
     """Run TypeScript compiler and filter results.
 
     Args:
         files: Tuple of file paths to filter errors for
         project: Path to the TypeScript project
         tsc_path: Path to the TypeScript compiler executable
+        pretty: Whether to use the --pretty flag for formatted output
 
     Returns:
         Exit code (0 for success, 1 for errors)
@@ -127,7 +140,7 @@ def run_tsc_for_file(files: tuple[str, ...], project: str | None, tsc_path: str 
         include_files[key] = 1
 
     # Execute TypeScript compiler
-    result, status = execute_tsc(tsc_path, project)
+    result, status = execute_tsc(tsc_path, project, pretty)
     if status != 0 or result is None:
         return status
 
@@ -176,9 +189,15 @@ def run_tsc_for_file(files: tuple[str, ...], project: str | None, tsc_path: str 
     default=None,
     help="Path to TypeScript compiler (default: no custom path)",
 )
-def check_command(files: tuple[str, ...], project: str | None, tsc_path: str | None):
+@click.option(
+    "--pretty",
+    is_flag=True,
+    default=False,
+    help="Use --pretty flag for formatted TypeScript compiler output",
+)
+def check_command(files: tuple[str, ...], project: str | None, tsc_path: str | None, pretty: bool = False):
     """Alternative command to run TypeScript type checking.
 
     This is an alternative to the main command and works the same way.
     """
-    return run_tsc_for_file(files, project, tsc_path)
+    return run_tsc_for_file(files, project, tsc_path, pretty)
