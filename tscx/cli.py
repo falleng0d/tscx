@@ -143,31 +143,22 @@ def run_tsc_for_file(files: tuple[str, ...], project: str | None, tsc_path: str 
         # but keep the original line for display
         sanitized_line = strip_ansi_escape_sequences(line)
 
-        # Detect if this is a continuation line
-        # It's a continuation if it starts with a space or if it's a line number reference
-        # like "170     resolver:" in the TypeScript error output
-        is_continuation = (
+        if (
             sanitized_line.startswith(" ")
             or re.match(r"^\d+\s+", sanitized_line) is not None
-        )
-
-        if is_continuation:
+        ):
             # This is a continuation line
             if show_continuation or show_all:
                 click.echo(line, err=True)
-        else:
-            # This is a new error message - extract the filename
-            # We already sanitized the line at the beginning of the loop
-            file_match = re.match(r"^([^:]+)", sanitized_line)
-            if file_match:
-                file_path = file_match[1].strip()
-                file_name = os.path.basename(file_path)
-                if file_name in include_files or show_all:
-                    show_continuation = True
-                    click.echo(line, err=True)  # Echo the original line with colors
-                    status = 1
-                else:
-                    show_continuation = False
+        elif file_match := re.match(r"^([^:(]+)", sanitized_line):
+            file_path = file_match[1].strip()
+            file_name = os.path.basename(file_path)
+            if file_name in include_files or show_all:
+                show_continuation = True
+                click.echo(line, err=True)  # Echo the original line with colors
+                status = 1
+            else:
+                show_continuation = False
 
     return status
 
