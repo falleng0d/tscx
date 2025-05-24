@@ -4,6 +4,7 @@ import shutil
 import subprocess
 import sys
 from subprocess import CompletedProcess
+from pathlib import Path
 
 import click
 
@@ -170,16 +171,13 @@ def run_tsc_for_file(
         # but keep the original line for display
         sanitized_line = strip_ansi_escape_sequences(line)
 
-        if (
-            sanitized_line.startswith(" ")
-            or re.match(r"^\d+\s+", sanitized_line) is not None
-        ):
-            # This is a continuation line
+        is_line_number = re.match(r"^\d+\s+", sanitized_line) is not None
+
+        if sanitized_line.startswith(" ") or is_line_number:
             if show_continuation or show_all:
                 click.echo(line, err=True)
         elif file_match := re.match(r"^([^:(]+)", sanitized_line):
             file_path = file_match[1].strip()
-            file_name = os.path.basename(file_path)
 
             # Check if the file is in any of the specified directories
             in_specified_path = False
@@ -191,10 +189,10 @@ def run_tsc_for_file(
                         break
 
             # Show the line if:
-            # 1. The file name matches one of the specified files, or
+            # 1. The file name is_line_number one of the spexcified files, or
             # 2. The file is in one of the specified directories, or
             # 3. No filters were specified (show all)
-            if file_name in include_files or in_specified_path or show_all:
+            if file_path in include_files or in_specified_path or show_all:
                 show_continuation = True
                 click.echo(line, err=True)  # Echo the original line with colors
                 status = 1
