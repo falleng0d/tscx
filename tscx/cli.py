@@ -4,9 +4,12 @@ import shutil
 import subprocess
 import sys
 from subprocess import CompletedProcess
-from pathlib import Path
 
 import click
+
+
+def cvt_path_os(path: str):
+    return path.replace("\\", "/")
 
 
 def strip_ansi_escape_sequences(text: str) -> str:
@@ -63,9 +66,10 @@ def cli(
     """Runs TypeScript type checking and filters the results to show only errors from
     specific files or directories.
 
-    Provide one or more file paths or directory paths as arguments to filter TypeScript errors.
-    If a directory path is provided, all errors from files within that directory and its
-    subdirectories will be shown. If no paths are provided, all errors will be shown.
+    Provide one or more file paths or directory paths as arguments to filter TypeScript
+    errors. If a directory path is provided, all errors from files within that directory
+    and its subdirectories will be shown. If no paths are provided, all errors will be
+    shown.
     """
     # If no subcommand is invoked, run the main functionality
     if ctx.invoked_subcommand is None:
@@ -153,9 +157,9 @@ def run_tsc_for_file(
             key = f
 
         if os.path.isdir(f):
-            include_paths.append(key)
+            include_paths.append(cvt_path_os(key))
         else:
-            include_files[key] = 1
+            include_files[cvt_path_os(key)] = 1
 
     result, status = execute_tsc(tsc_path, project, pretty)
     if status != 0 or result is None:
